@@ -769,7 +769,8 @@ WasiExpect<Poller> INode::pollOneoff(__wasi_size_t NSubscriptions) noexcept {
   }
 }
 
-WasiExpect<void> INode::getAddrinfo(const char *NodeStr, const char *ServiceStr,
+WasiExpect<void> INode::getAddrinfo(std::string_view Node,
+                                    std::string_view Service,
                                     const __wasi_addrinfo_t &Hint,
                                     uint32_t MaxResLength,
                                     Span<__wasi_addrinfo_t *> WasiAddrinfoArray,
@@ -777,6 +778,30 @@ WasiExpect<void> INode::getAddrinfo(const char *NodeStr, const char *ServiceStr,
                                     Span<char *> AiAddrSaDataArray,
                                     Span<char *> AiCanonnameArray,
                                     /*Out*/ __wasi_size_t &ResLength) noexcept {
+  std::string NodeStr;
+  const char *NodeCStr = nullptr;
+  if (!Node.empty()) {
+    if (const auto pos = Node.find_first_of('\0');
+        pos != std::string_view::npos) {
+      NodeCStr = Node.data();
+    } else {
+      NodeStr = Node;
+      NodeCStr = NodeStr.c_str();
+    }
+  }
+
+  std::string ServiceStr;
+  const char *ServiceCStr = nullptr;
+  if (!Service.empty()) {
+    if (const auto pos = Service.find_first_of('\0');
+        pos != std::string_view::npos) {
+      ServiceCStr = Service.data();
+    } else {
+      ServiceStr = Service;
+      ServiceCStr = ServiceStr.c_str();
+    }
+  }
+
   struct addrinfo SysHint;
   SysHint.ai_flags = Hint.ai_flags;
   SysHint.ai_family = Hint.ai_family;
@@ -788,7 +813,7 @@ WasiExpect<void> INode::getAddrinfo(const char *NodeStr, const char *ServiceStr,
   SysHint.ai_next = nullptr;
 
   struct addrinfo *SysResPtr = nullptr;
-  if (auto Res = ::getaddrinfo(NodeStr, ServiceStr, &SysHint, &SysResPtr);
+  if (auto Res = ::getaddrinfo(NodeCStr, ServiceCStr, &SysHint, &SysResPtr);
       unlikely(Res < 0)) {
     return WasiUnexpect(fromEAIErrNo(Res));
   }
